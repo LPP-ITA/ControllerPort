@@ -1,0 +1,44 @@
+name: Controller Firmware Pipeline
+
+on:
+  push:
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  compile-sketch:
+    name: 🔌 Compile ESP8266
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Instala dependências do Arduino CLI
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+      
+      - name: Install ESP8266 Core
+        run: |
+          arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core install esp8266:esp8266 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+
+      - name: Install Libraries
+        run: |
+          arduino-cli lib install "MFRC522" "ArduinoJson" "AsyncMqttClient" "WiFiManager" "Ticker"
+
+      # Compila o código
+      - name: Compile Sketch
+        run: |
+          mkdir build
+          # Ajuste "PortaController.ino" se o nome do arquivo for diferente na raiz
+          arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --output-dir build ./PortaController.ino
+
+      # Cria Release e Anexa o Binário (.bin)
+      - name: Release Firmware
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/*.bin
+          generate_release_notes: true
